@@ -1,0 +1,59 @@
+import { Link } from "wouter";
+
+export function Footer() {
+  return (
+    <footer className="bg-card border-t border-border pt-16 pb-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+          <div className="col-span-1 md:col-span-2">
+            <span className="font-display text-2xl font-bold tracking-wider text-foreground">
+              DIGOR<span className="text-primary">.</span>
+            </span>
+            <p className="mt-4 text-muted-foreground max-w-sm">
+              Scalable Managed Marketing and Data Infrastructure Agency delivering precision outreach operations and technical CRM infrastructure to real estate investors.
+            </p>
+          </div>
+          
+          <div>
+            <h4 className="font-semibold text-foreground mb-4">Navigation</h4>
+            <ul className="space-y-2">
+              {['Services', 'Methodology', 'Case Studies', 'Team', 'About'].map((item) => (
+                <li key={item}>
+                  <a href={`#${item.toLowerCase().replace(' ', '-')}`} className="text-muted-foreground hover:text-primary transition-colors">
+                    {item}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="font-semibold text-foreground mb-4">Contact</h4>
+            <ul className="space-y-2 text-muted-foreground">
+              <li>
+                <a href="mailto:digorva@digorcom.com" className="hover:text-primary transition-colors">digorva@digorcom.com</a>
+              </li>
+              <li>(470) 835-3617</li>
+              <li>(602) 654-3140</li>
+            </ul>
+            <div className="mt-4 pt-4 border-t border-border/50">
+              <h4 className="font-semibold text-foreground mb-2 text-sm">Legal</h4>
+              <Link href="/terms-of-service" className="text-muted-foreground hover:text-primary transition-colors text-sm">
+                Terms of Service
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        <div className="pt-8 border-t border-border/50 flex flex-col md:flex-row justify-between items-center text-sm text-muted-foreground">
+          <p>© {new Date().getFullYear()} Digor LLC. All rights reserved.</p>
+          <p className="mt-2 md:mt-0 text-center md:text-right">
+            Wyoming Limited Liability Company <br className="md:hidden" />
+            <span className="hidden md:inline"> | </span>
+            1095 Sugar View Dr Ste 500, Sheridan, WY 82801
+          </p>
+        </div>
+      </div>
+    </footer>
+  );
+}

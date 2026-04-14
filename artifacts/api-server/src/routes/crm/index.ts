@@ -1,0 +1,132 @@
+import { Router } from "express";
+import { db } from "@workspace/db";
+import { crmSubmissionLinks, crmLeads, crmCampaigns } from "@workspace/db/schema";
+import { eq, sql } from "drizzle-orm";
+import authRouter from "./auth";
+import campaignsRouter from "./campaigns";
+import leadsRouter from "./leads";
+import tasksRouter from "./tasks";
+import usersRouter from "./users";
+import linksRouter from "./links";
+import statsRouter from "./stats";
+import sequencesRouter from "./sequences";
+import compsRouter from "./comps";
+import notificationsRouter from "./notifications";
+import buyersRouter from "./buyers";
+
+const router = Router();
+
+// Auth: POST /crm/auth/login, GET /crm/me
+router.use("/crm", authRouter);
+
+// Campaign management
+router.use("/crm/campaigns", campaignsRouter);
+
+// Leads CRUD + notes + estimate
+router.use("/crm/leads", leadsRouter);
+
+// Lead comps
+router.use("/crm/leads", compsRouter);
+
+// Tasks CRUD
+router.use("/crm/tasks", tasksRouter);
+
+// User management
+router.use("/crm/users", usersRouter);
+
+// Submission links management
+router.use("/crm/links", linksRouter);
+
+// Email sequences
+router.use("/crm/sequences", sequencesRouter);
+
+// Public submission form: GET /crm/public/submit/:token
+router.get("/crm/public/submit/:token", async (req, res) => {
+  const { token } = req.params;
+  try {
+    const [link] = await db.select().from(crmSubmissionLinks).where(eq(crmSubmissionLinks.token, token)).limit(1);
+    if (!link) { res.status(404).json({ error: "Link not found" }); return; }
+    let campaignName: string | null = null;
+    if (link.campaignId) {
+      const [campaign] = await db.select({ name: crmCampaigns.name }).from(crmCampaigns).where(eq(crmCampaigns.id, link.campaignId)).limit(1);
+      campaignName = campaign?.name ?? null;
+    }
+    res.json({ label: link.label, leadSource: link.leadSource, active: link.active, campaignName });
+  } catch (err) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Parse a freeform US address string into components
+function parseAddressComponents(full: string): { address: string; city: string | null; state: string | null; zip: string | null } {
+  // Try "123 Main St, City Name, ST 12345" or "123 Main St, City, ST 12345-6789"
+  const m = full.match(/^(.+?),\s*(.+?),\s*([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+  if (m) return { address: m[1].trim(), city: m[2].trim(), state: m[3].toUpperCase(), zip: m[4].trim() };
+  // Try "123 Main St, City, ST" (no zip)
+  const m2 = full.match(/^(.+?),\s*(.+?),\s*([A-Za-z]{2})$/);
+  if (m2) return { address: m2[1].trim(), city: m2[2].trim(), state: m2[3].toUpperCase(), zip: null };
+  // Fallback — store entire string as address
+  return { address: full.trim(), city: null, state: null, zip: null };
+}
+
+// Public lead submission: POST /crm/public/submit/:token
+router.post("/crm/public/submit/:token", async (req, res) => {
+  const { token } = req.params;
+  try {
+    const [link] = await db.select().from(crmSubmissionLinks).where(eq(crmSubmissionLinks.token, token)).limit(1);
+    if (!link || !link.active) { res.status(404).json({ error: "Submission link not found or inactive" }); return; }
+    const data = req.body;
+
+    // Parse address into components (form sends a single combined field)
+    const { address, city, state, zip } = parseAddressComponents(data.address || "");
+
+    // Asking price: try numeric parse, keep raw text too
+    const askingPriceRaw: string | null = data.askingPriceText || null;
+    const askingPriceNum = askingPriceRaw ? parseFloat(askingPriceRaw.replace(/[^0-9.]/g, "")) : null;
+
+    // Build notes from message if provided
+    const notes = data.message ? data.message.trim() : null;
+
+    await db.insert(crmLeads).values({
+      campaignId: link.campaignId,
+      sellerName: data.sellerName,
+      phone: data.phone || null,
+      email: data.email || null,
+      leadSource: link.leadSource || data.leadSource || "Submission Form",
+      address,
+      city: data.city || city || null,
+      state: data.state || state || null,
+      zip: data.zip || zip || null,
+      propertyType: data.propertyType || null,
+      beds: data.beds ? parseInt(data.beds) : null,
+      baths: data.baths ? data.baths.toString() : null,
+      sqft: data.sqft ? parseInt(data.sqft) : null,
+      condition: data.condition ? parseInt(data.condition) : null,
+      currentValue: data.currentValue ? parseFloat(data.currentValue).toString() : null,
+      occupancy: data.occupancy || null,
+      isRental: data.occupancy === "Rented",
+      reasonForSelling: data.reasonForSelling || null,
+      howSoon: data.howSoon || null,
+      askingPrice: (!isNaN(askingPriceNum!) && askingPriceNum! > 0) ? askingPriceNum!.toString() : null,
+      askingPriceText: askingPriceRaw,
+      notes,
+      status: "new",
+    });
+    await db.update(crmSubmissionLinks).set({ submissionsCount: sql`${crmSubmissionLinks.submissionsCount} + 1` }).where(eq(crmSubmissionLinks.id, link.id));
+    res.status(201).json({ success: true, message: "Thank you! Your property has been submitted. We will be in touch soon." });
+  } catch (err) {
+    console.error("Public submission error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// CRM stats dashboard
+router.use("/crm/stats", statsRouter);
+
+// Notifications
+router.use("/crm/notifications", notificationsRouter);
+
+// Buyers list
+router.use("/crm/buyers", buyersRouter);
+
+export default router;

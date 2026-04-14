@@ -1,0 +1,19 @@
+packages:
+  "recharts": "For dashboard charts and lead statistics visualization"
+  "date-fns": "For formatting tasks and lead creation dates"
+  "framer-motion": "For page transitions and interactive micro-animations"
+  "clsx": "Utility for constructing className strings"
+  "tailwind-merge": "Utility for merging tailwind classes safely"
+
+images:
+  - path: "artifacts/digor-crm/public/images/auth-bg.png"
+    description: "Abstract dark professional background with subtle glowing indigo and deep blue mesh gradients, sleek enterprise software feel"
+    aspect_ratio: "16:9"
+  - path: "artifacts/digor-crm/public/images/logo.png"
+    description: "Minimal geometric logo mark for a real estate data company in bright indigo on a completely transparent background"
+    aspect_ratio: "1:1"
+
+notes:
+  - "Data is fetched using Orval generated hooks from @workspace/api-client-react"
+  - "Auth is managed via a fetch interceptor that attaches the JWT from localStorage"
+  - "Routing is handled with wouter, base path mapped to import.meta.env.BASE_URL"

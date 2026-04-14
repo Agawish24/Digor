@@ -1,0 +1,196 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap');
+@import "tailwindcss";
+@import "tw-animate-css";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-card-border: hsl(var(--card-border));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-popover-border: hsl(var(--popover-border));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-primary-border: var(--primary-border);
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-secondary-border: var(--secondary-border);
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-muted-border: var(--muted-border);
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-accent-border: var(--accent-border);
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-destructive-border: var(--destructive-border);
+
+  --color-sidebar: hsl(var(--sidebar));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-primary-border: var(--sidebar-primary-border);
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-accent-border: var(--sidebar-accent-border);
+  --color-sidebar-ring: hsl(var(--sidebar-ring));
+
+  --font-sans: 'Inter', sans-serif;
+  --font-display: 'Plus Jakarta Sans', sans-serif;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* DEEP DARK PROFESSIONAL THEME */
+:root {
+  --background: 224 71% 4%;
+  --foreground: 210 20% 98%;
+  
+  --card: 222 47% 7%;
+  --card-foreground: 210 20% 98%;
+  --card-border: 217 33% 15%;
+
+  --sidebar: 224 71% 4%;
+  --sidebar-foreground: 210 20% 98%;
+  --sidebar-border: 217 33% 15%;
+  --sidebar-primary: 226 100% 64%;
+  --sidebar-primary-foreground: 210 20% 98%;
+  --sidebar-accent: 217 33% 15%;
+  --sidebar-accent-foreground: 210 20% 98%;
+  --sidebar-ring: 226 100% 64%;
+
+  --popover: 222 47% 7%;
+  --popover-foreground: 210 20% 98%;
+  --popover-border: 217 33% 15%;
+
+  --primary: 226 100% 64%;
+  --primary-foreground: 210 20% 98%;
+  
+  --secondary: 217 33% 15%;
+  --secondary-foreground: 210 20% 98%;
+  
+  --muted: 217 33% 15%;
+  --muted-foreground: 215 20% 65%;
+
+  --accent: 226 100% 64%;
+  --accent-foreground: 210 20% 98%;
+
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 210 20% 98%;
+
+  --border: 217 33% 15%;
+  --input: 217 33% 15%;
+  --ring: 226 100% 64%;
+
+  --radius: 0.75rem;
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.5);
+  --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.5);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.5);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.5);
+  
+  --button-outline: rgba(255,255,255, .15);
+  --badge-outline: rgba(255,255,255, .15);
+  --opaque-button-border-intensity: 10;
+  --elevate-1: rgba(255,255,255, .05);
+  --elevate-2: rgba(255,255,255, .10);
+}
+
+/* LIGHT MODE — Digor Brand Palette */
+html.light {
+  --background: 200 10% 96%;
+  --foreground: 222 47% 11%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --card-border: 200 12% 87%;
+
+  --sidebar: 200 8% 92%;
+  --sidebar-foreground: 222 47% 11%;
+  --sidebar-border: 200 12% 84%;
+  --sidebar-primary: 226 72% 50%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 200 8% 86%;
+  --sidebar-accent-foreground: 222 47% 11%;
+  --sidebar-ring: 226 72% 50%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --popover-border: 200 12% 87%;
+
+  --primary: 226 72% 50%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 200 8% 86%; /* #D3D9DC range */
+  --secondary-foreground: 222 47% 11%;
+
+  --muted: 200 8% 90%;
+  --muted-foreground: 198 14% 40%; /* #69808C range */
+
+  --accent: 226 72% 50%;
+  --accent-foreground: 0 0% 100%;
+
+  --destructive: 0 72% 45%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 200 12% 87%;
+  --input: 200 12% 87%;
+  --ring: 226 72% 50%;
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.08);
+  --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.04);
+
+  --button-outline: rgba(0,0,0, .12);
+  --badge-outline: rgba(0,0,0, .12);
+  --opaque-button-border-intensity: 80;
+  --elevate-1: rgba(0,0,0, .04);
+  --elevate-2: rgba(0,0,0, .07);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply font-sans antialiased bg-background text-foreground selection:bg-primary/30 selection:text-primary-foreground;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    @apply font-semibold tracking-tight;
+  }
+}
+
+/* Elevate utilities for interaction */
+@layer utilities {
+  input[type="search"]::-webkit-search-cancel-button { @apply hidden; }
+  .hover-elevate { position: relative; z-index: 0; }
+  .hover-elevate::after { content: ""; pointer-events: none; position: absolute; inset: 0px; border-radius: inherit; z-index: 999; }
+  .hover-elevate:hover::after { background-color: var(--elevate-1); }
+  .active-elevate-2:active::after { background-color: var(--elevate-2); }
+  
+  /* Glassmorphism utilities */
+  .glass-panel {
+    @apply bg-card/60 backdrop-blur-xl border border-white/10 shadow-xl;
+  }
+}
