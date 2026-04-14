@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ['nodejs-22_x', 'pnpm', 'openssl', 'postgresql']
+nixPkgs = ['nodejs_22', 'pnpm', 'openssl', 'postgresql']
 nixLibs = ['zlib', 'openssl', 'stdenv.cc.cc.lib']
 
 [phases.build]
