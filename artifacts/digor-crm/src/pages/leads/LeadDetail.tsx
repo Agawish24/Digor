@@ -1052,8 +1052,24 @@ export default function LeadDetail() {
   const queryClient = useQueryClient();
   const leadId = Number(id);
 
-  const { data: me } = useCrmGetMe();
-  const { data: lead, isLoading } = useCrmGetLead(leadId);
+  // Cache me for the whole session — it never changes while logged in
+  const { data: me } = useQuery<any>({
+    queryKey: ["/api/crm/me"],
+    queryFn: () => apiFetch("/me"),
+    staleTime: 10 * 60 * 1000,
+  });
+
+  // Fetch lead + comps in one round-trip, pre-populate comps cache for child panels
+  const { data: lead, isLoading } = useQuery<any>({
+    queryKey: [`/api/crm/leads/${leadId}`],
+    queryFn: async () => {
+      const r = await apiFetch(`/leads/${leadId}/full`);
+      queryClient.setQueryData([`/api/crm/leads/${leadId}/comps`], r.comps ?? []);
+      return r;
+    },
+    enabled: !!leadId,
+    staleTime: 30 * 1000,
+  });
   const notes: any[] = (lead as any)?.notes ?? [];
   const tasks: any[] = (lead as any)?.tasks ?? [];
 

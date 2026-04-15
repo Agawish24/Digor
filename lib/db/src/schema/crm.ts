@@ -89,14 +89,18 @@ export const crmNotes = pgTable("crm_notes", {
   content: text("content").notNull(),
   noteType: text("note_type").notNull().default("note"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("crm_notes_lead_id_idx").on(t.leadId),
+]);
 
 export const crmLeadFollowers = pgTable("crm_lead_followers", {
   id: serial("id").primaryKey(),
   leadId: integer("lead_id").notNull().references(() => crmLeads.id, { onDelete: "cascade" }),
   userId: integer("user_id").notNull().references(() => crmUsers.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("crm_lead_followers_lead_id_idx").on(t.leadId),
+]);
 
 export const crmNotifications = pgTable("crm_notifications", {
   id: serial("id").primaryKey(),
@@ -138,7 +142,9 @@ export const crmTasks = pgTable("crm_tasks", {
   source: text("source").notNull().default("manual"),
   escalated: boolean("escalated").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("crm_tasks_lead_id_idx").on(t.leadId),
+]);
 
 export const crmEmailSequences = pgTable("crm_email_sequences", {
   id: serial("id").primaryKey(),
@@ -183,7 +189,9 @@ export const crmComps = pgTable("crm_comps", {
   notes: text("notes"),
   source: text("source").notNull().default("manual"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("crm_comps_lead_id_idx").on(t.leadId),
+]);
 
 export const crmBuyers = pgTable("crm_buyers", {
   id: serial("id").primaryKey(),

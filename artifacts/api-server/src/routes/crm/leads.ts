@@ -326,6 +326,65 @@ router.get("/:id", crmAuth, async (req, res) => {
   }
 });
 
+// GET /:id/full — lead + comps in a single round-trip (used by LeadDetail page)
+router.get("/:id/full", crmAuth, async (req, res) => {
+  const id = parseInt(req.params.id as string);
+  const crmUser = (req as any).crmUser;
+  try {
+    const [lead] = await db.select().from(crmLeads).where(eq(crmLeads.id, id)).limit(1);
+    if (!lead) { res.status(404).json({ error: "Lead not found" }); return; }
+    if (crmUser.role !== "super_admin" && lead.campaignId !== crmUser.campaignId) {
+      res.status(403).json({ error: "Access denied" }); return;
+    }
+
+    const [notes, tasks, followers, assignedUserRow, comps] = await Promise.all([
+      db.select({
+        id: crmNotes.id, leadId: crmNotes.leadId, userId: crmNotes.userId,
+        content: crmNotes.content, noteType: crmNotes.noteType, createdAt: crmNotes.createdAt, userName: crmUsers.name,
+      }).from(crmNotes).leftJoin(crmUsers, eq(crmNotes.userId, crmUsers.id)).where(eq(crmNotes.leadId, id)).orderBy(crmNotes.createdAt),
+      db.select({
+        id: crmTasks.id, leadId: crmTasks.leadId, assignedTo: crmTasks.assignedTo,
+        title: crmTasks.title, description: crmTasks.description, dueDate: crmTasks.dueDate,
+        status: crmTasks.status, createdAt: crmTasks.createdAt, assignedToName: crmUsers.name,
+      }).from(crmTasks).leftJoin(crmUsers, eq(crmTasks.assignedTo, crmUsers.id)).where(eq(crmTasks.leadId, id)).orderBy(crmTasks.dueDate),
+      db.select().from(crmLeadFollowers).where(eq(crmLeadFollowers.leadId, id)),
+      lead.assignedTo
+        ? db.select().from(crmUsers).where(eq(crmUsers.id, lead.assignedTo)).limit(1).then(r => r[0] ?? null)
+        : Promise.resolve(null),
+      db.select().from(crmComps).where(eq(crmComps.leadId, id)).orderBy(desc(crmComps.createdAt)),
+    ]);
+
+    const isFollowing = followers.some(f => f.userId === crmUser.userId);
+
+    res.json({
+      ...formatLead(lead, assignedUserRow),
+      notes: notes.map(n => ({
+        id: n.id, leadId: n.leadId, userId: n.userId, userName: n.userName || "Unknown",
+        content: n.content, noteType: n.noteType || "note", createdAt: n.createdAt.toISOString(),
+      })),
+      tasks: tasks.map(t => ({
+        id: t.id, leadId: t.leadId, assignedTo: t.assignedTo, assignedToName: t.assignedToName || null,
+        title: t.title, description: t.description, dueDate: t.dueDate ? t.dueDate.toISOString() : null,
+        status: t.status, createdAt: t.createdAt.toISOString(), leadAddress: lead.address,
+      })),
+      followerCount: followers.length,
+      isFollowing,
+      comps: comps.map(c => ({
+        id: c.id, leadId: c.leadId, address: c.address, beds: c.beds,
+        baths: c.baths ? parseFloat(c.baths) : null, sqft: c.sqft, yearBuilt: c.yearBuilt,
+        salePrice: c.salePrice ? parseFloat(c.salePrice) : null,
+        adjustedPrice: c.adjustedPrice ? parseFloat(c.adjustedPrice) : null,
+        soldDate: c.soldDate, notes: c.notes, source: c.source || "manual",
+        pricePerSqft: c.sqft && c.salePrice ? Math.round(parseFloat(c.salePrice) / c.sqft) : null,
+        createdAt: c.createdAt,
+      })),
+    });
+  } catch (err) {
+    console.error("CRM get lead full error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.patch("/:id", crmAuth, async (req, res) => {
   const id = parseInt(req.params.id as string);
   const crmUser = (req as any).crmUser;
