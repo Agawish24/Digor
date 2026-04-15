@@ -69,7 +69,7 @@ app.use(
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'"],
         scriptSrcAttr: ["'none'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         imgSrc: ["'self'", "data:", "https:"],
         connectSrc: ["'self'"],
         fontSrc: ["'self'", "https:"],
