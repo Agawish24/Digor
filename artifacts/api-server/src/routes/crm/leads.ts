@@ -1393,7 +1393,7 @@ router.get("/:id/fetch-comps/poll", crmAuth, async (req, res) => {
   }
 });
 
-// ─── AI Deal Scorer ───────────────────────────────────────────────────────────
+// ─── AI Deal Scorer (Buyer/Wholesaler Perspective) ───────────────────────────
 router.post("/:id/ai-deal-score", crmAuth, async (req, res) => {
   const id = parseInt(req.params.id as string);
   const crmUser = (req as any).crmUser;
@@ -1417,34 +1417,34 @@ router.post("/:id/ai-deal-score", crmAuth, async (req, res) => {
     const formattedAsking = askingPrice ? "$" + askingPrice.toLocaleString() : "not set";
     const reason = lead.reasonForSelling || "Not provided";
     const occupancyInfo = lead.isRental 
-      ? `CURRENTLY RENTED for $${lead.rentalAmount}/mo (Tenant in place)` 
+      ? `Currently rented ($${lead.rentalAmount}/mo)` 
       : (lead.occupancy || "unknown");
 
-    const prompt = `You are a real estate investment analyst. 
-Analyze this specific wholesale deal and provide a realistic investment score.
+    const prompt = `You are a Real Estate Wholesaling Analyst. Your goal is to help the user (the BUYER) acquire this property at a deep discount.
 
 CRITICAL DATA:
-- Reason for Selling: ${reason}
+- Seller Motivation: ${reason}
 - Timeline: ${lead.howSoon || "Not provided"}
-- MAO: ${formattedMao}
-- Asking Price: ${formattedAsking}
-- Occupancy: ${occupancyInfo}
+- Our MAO (Hard Ceiling): ${formattedMao}
+- Seller Asking Price: ${formattedAsking}
+- Property Status: ${occupancyInfo}
 
-INSTRUCTIONS:
-1. SELLER MOTIVATION: Analyze the specific reason for selling: "${reason}". Do not hallucinate other reasons.
-2. FINANCIALS: Base your score and recommendation on the spread between Asking (${formattedAsking}) and MAO (${formattedMao}).
-3. RENTAL: If rented, include tenant-related cash flow as a positive and possession/legal as a risk.
+NEGOTIATION RULES FOR THE BUYER (USER):
+1. PERSPECTIVE: The user is the INVESTOR/BUYER. The lead is the SELLER.
+2. OPENING OFFER: Suggest an opening offer approximately 15-20% BELOW our MAO of ${formattedMao}.
+3. WALK-AWAY PRICE: The MAO (${formattedMao}) is the absolute maximum price the buyer should pay.
+4. SPREAD: If Asking (${formattedAsking}) is higher than MAO (${formattedMao}), warn the user that this is a difficult negotiation and requires high seller motivation to close the gap.
 
-Reply ONLY with this JSON structure (replace placeholders with actual analysis):
+Reply ONLY with this JSON structure:
 {
   "score": 0,
   "grade": "Letter grade",
-  "verdict": "A summary of the deal based on ${formattedAsking} vs ${formattedMao}",
-  "profitPotential": { "score": 0, "note": "Analysis of the financial spread" },
-  "sellerMotivation": { "score": 0, "note": "Analysis based on ${reason}" },
-  "dealRisk": { "score": 0, "note": "Analysis of risks including ${occupancyInfo}" },
-  "urgency": { "score": 0, "note": "Analysis of the ${lead.howSoon} timeline" },
-  "recommendation": "Suggest opening and walk-away prices based on the MAO of ${formattedMao}",
+  "verdict": "Investor-focused summary of the price spread and motivation.",
+  "profitPotential": { "score": 0, "note": "Analysis of profit based on buying AT or BELOW the MAO." },
+  "sellerMotivation": { "score": 0, "note": "Analysis based ONLY on: ${reason}" },
+  "dealRisk": { "score": 0, "note": "Risks regarding repairs or ${occupancyInfo}" },
+  "urgency": { "score": 0, "note": "Analysis based on ${lead.howSoon}" },
+  "recommendation": "Suggest opening at a discount and walking at the MAO ceiling of ${formattedMao}.",
   "redFlags": [],
   "positives": []
 }`;
@@ -1454,10 +1454,13 @@ Reply ONLY with this JSON structure (replace placeholders with actual analysis):
       headers: { "Authorization": `Bearer ${aiApiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: process.env.AI_MODEL || "llama-3.1-8b-instant",
-        max_tokens: 1200,
+        max_tokens: 1000,
         response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: "You are a real estate investment analyst. You must output valid JSON based on provided lead data." },
+          { 
+            role: "system", 
+            content: "You are a Real Estate Wholesale Investment Analyst. You advise the buyer on how to get the best deal below their Max Allowable Offer (MAO)." 
+          },
           { role: "user", content: prompt },
         ],
       }),

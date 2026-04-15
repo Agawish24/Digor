@@ -1058,6 +1058,8 @@ function AiRepairEstimator({ leadId, onApplied }: { leadId: number; onApplied: (
     </Card>
   );
 }
+
+// ─── AI Deal Scorer ────────────────────────────────────────────────────────────
 function AiDealScorer({ leadId }: { leadId: number }) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
