@@ -65,3 +65,5 @@ backup.sql~
 # Attached assets (uploaded files, screenshots, etc.)
 attached_assets/
 
+# Exclude Replit Agent sandbox
+artifacts/mockup-sandbox/

@@ -1,7 +1,7 @@
 {
   "name": "workspace",
   "engines": {
-    "node": ">=22.12.0"
+    "node": "20"
   },
   "version": "0.0.0",
   "license": "MIT",
