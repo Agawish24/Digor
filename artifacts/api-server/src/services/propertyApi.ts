@@ -175,6 +175,75 @@ export function getLastSkipTraceError(): SkipTraceError | null {
   return _lastSkipTraceError;
 }
 
+// ─── PeopleDataLabs Skip Trace fallback ───────────────────────────────────────
+// Used when PropertyAPI credits are exhausted.
+// Endpoint: GET https://api.peopledatalabs.com/v5/person/enrich
+// Cost: ~$0.265/credit (trial includes 100 free credits)
+
+async function runSkipTracePDL(
+  street: string,
+  city?: string | null,
+  state?: string | null,
+  zip?: string | null,
+): Promise<SkipTraceResult | null> {
+  const apiKey = process.env.PEOPLEDATALABS_API_KEY?.trim();
+  if (!apiKey) return null;
+
+  try {
+    const params = new URLSearchParams();
+    if (street) params.set("street_address", street);
+    if (city)   params.set("locality", city);
+    if (state)  params.set("region", state);
+    if (zip)    params.set("postal_code", zip);
+    params.set("min_likelihood", "0.5");
+    params.set("pretty", "false");
+
+    const res = await fetch(
+      `https://api.peopledatalabs.com/v5/person/enrich?${params.toString()}`,
+      { headers: { "X-Api-Key": apiKey } },
+    );
+
+    if (res.status === 404) {
+      // No record found — not an error
+      logger.info("[PDL skipTrace] no record found");
+      _lastSkipTraceError = { apiMessage: "No contact data found (PDL)" };
+      return null;
+    }
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      logger.error({ status: res.status, body: text.slice(0, 300) }, "[PDL skipTrace] HTTP error");
+      _lastSkipTraceError = { httpStatus: res.status, apiMessage: text.slice(0, 200) };
+      return null;
+    }
+
+    const json = await res.json() as any;
+    const data = json?.data ?? {};
+
+    const phones: SkipTracePhone[] = (data.phone_numbers || []).slice(0, 5).map((n: string) => ({
+      number: n,
+      type: undefined,
+      isDisconnected: false,
+    }));
+    const emails: string[] = (data.emails || []).slice(0, 5).map((e: any) =>
+      typeof e === "string" ? e : e?.address
+    ).filter(Boolean);
+
+    if (!phones.length && !emails.length) {
+      logger.info("[PDL skipTrace] matched but no phones/emails");
+      _lastSkipTraceError = { apiMessage: "No contact data found (PDL)" };
+      return null;
+    }
+
+    logger.info({ phones: phones.length, emails: emails.length }, "[PDL skipTrace] success");
+    return { matchStatus: "matched", phones, emails };
+  } catch (err) {
+    logger.error({ err }, "[PDL skipTrace] fetch error");
+    _lastSkipTraceError = { apiMessage: String(err) };
+    return null;
+  }
+}
+
 export async function runSkipTrace(
   street: string,
   city?: string | null,
@@ -186,8 +255,10 @@ export async function runSkipTrace(
   _lastSkipTraceError = null;
   const apiKey = getNextApiKey();
   if (!apiKey) {
-    logger.warn("[skipTrace] No API keys configured");
-    _lastSkipTraceError = { apiMessage: "No API keys configured on server" };
+    logger.warn("[skipTrace] No PropertyAPI keys configured — trying PDL fallback");
+    const pdlResult = await runSkipTracePDL(street, city, state, zip);
+    if (pdlResult) return pdlResult;
+    _lastSkipTraceError = { apiMessage: "No skip trace API keys configured on server" };
     return null;
   }
   const keyIndex = (_keyIndex === 0 ? loadApiKeys().length : _keyIndex);
@@ -217,6 +288,11 @@ export async function runSkipTrace(
     if (!resp.ok) {
       const text = await resp.text().catch(() => resp.statusText);
       logger.error({ status: resp.status, body: text.slice(0, 500) }, `[skipTrace] key#${keyIndex} HTTP error`);
+      if (resp.status === 402 || text.toLowerCase().includes("insufficient credits") || text.toLowerCase().includes("credit")) {
+        logger.info("[skipTrace] PropertyAPI credits exhausted — trying PDL fallback");
+        const pdlResult = await runSkipTracePDL(street, city, state, zip);
+        if (pdlResult) return pdlResult;
+      }
       _lastSkipTraceError = { httpStatus: resp.status, apiMessage: text.slice(0, 300) };
       return null;
     }
@@ -227,7 +303,9 @@ export async function runSkipTrace(
 
     const hasAnyResult = item.phone_1_number || item.email_1 || item.name_first || item.name_last;
     if (!hasAnyResult) {
-      logger.warn({ status: json.status }, "[skipTrace] API returned data item but no contacts found");
+      logger.warn({ status: json.status }, "[skipTrace] PropertyAPI returned no contacts — trying PDL fallback");
+      const pdlResult = await runSkipTracePDL(street, city, state, zip);
+      if (pdlResult) return pdlResult;
       _lastSkipTraceError = { apiMessage: "No contact data found for this property owner" };
       return null;
     }

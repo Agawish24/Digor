@@ -13,6 +13,7 @@ import { randomUUID } from "crypto";
 import { logger } from "../lib/logger";
 import Papa from "papaparse";
 import { estimateMarketPricePerSqft, ADJUSTMENT_FACTORS } from "../services/propertyApi";
+import { attomGet, hasAttomKey } from "../services/attomApi";
 
 const router: Router = Router();
 
@@ -180,26 +181,7 @@ async function lookupProperty(address: string) {
   throw new Error(lastError || "PropertyAPI: all keys exhausted");
 }
 
-// ─── ATTOM Client ─────────────────────────────────────────────────────────────
-
-const ATTOM_BASE = "https://api.gateway.attomdata.com";
-
-function getAttomKey(): string | null {
-  return process.env.ATTOM_API_KEY?.trim() || null;
-}
-
-async function attomGet(path: string, params: Record<string, string | number>) {
-  const key = getAttomKey();
-  if (!key) throw new Error("ATTOM_API_KEY not configured");
-  const url = new URL(`${ATTOM_BASE}${path}`);
-  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));
-  const res = await fetch(url.toString(), { headers: { "apikey": key, "accept": "application/json" } });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`ATTOM ${res.status}: ${text.slice(0, 300)}`);
-  }
-  return res.json();
-}
+// ATTOM client is imported from ../services/attomApi (supports key rotation: ATTOM_API_KEY + ATTOM_API_KEY_2)
 
 // ─── County FIPS Resolution (Census API) ──────────────────────────────────────
 
@@ -342,7 +324,7 @@ router.post("/tools/auth/verify", (req, res) => {
 router.get("/tools/status", requirePin, (_req, res) => {
   res.json({
     skipTraceConfigured: getPropertyApiKeys().length > 0,
-    attomConfigured: !!getAttomKey(),
+    attomConfigured: hasAttomKey(),
   });
 });
 
@@ -532,7 +514,7 @@ router.post("/tools/distressed/search", requirePin, async (req, res) => {
     return;
   }
 
-  if (!getAttomKey()) {
+  if (!hasAttomKey()) {
     res.status(503).json({ error: "ATTOM_API_KEY not configured" });
     return;
   }
@@ -827,7 +809,7 @@ router.post("/tools/arv/calculate", requirePin, async (req, res) => {
   if (!street) { res.status(400).json({ error: "Street address is required" }); return; }
 
   if (!getPropertyApiKeys().length) { res.status(503).json({ error: "PropertyAPI keys not configured" }); return; }
-  if (!getAttomKey()) { res.status(503).json({ error: "ATTOM_API_KEY not configured" }); return; }
+  if (!hasAttomKey()) { res.status(503).json({ error: "ATTOM_API_KEY not configured" }); return; }
 
   try {
     // Step 1: Get subject property details via PropertyAPI (geocoding + beds/baths/year)
@@ -1028,7 +1010,7 @@ router.post("/tools/property-lookup/search", requirePin, async (req, res) => {
     const address2 = [city, state, zip].filter(Boolean).join(" ");
     const [propData, attomResult, skipTraceResult] = await Promise.allSettled([
       lookupProperty(fullAddress),
-      getAttomKey()
+      hasAttomKey()
         ? attomGet("/propertyapi/v1.0.0/property/detailmortgageowner", {
             address1: street,
             ...(address2 ? { address2 } : {}),

@@ -4,7 +4,8 @@ import { crmLeads, crmUsers, crmNotes, crmTasks, crmCampaigns, crmLeadFollowers,
 import { eq, desc, ilike, and, or, sql, ne } from "drizzle-orm";
 import { crmAuth, crmAdminOnly } from "./middleware";
 import { onLeadCreated, onLeadStatusChanged } from "../../services/automation";
-import { fetchPropertyData, startCompsExport, pollCompsExport, downloadComps, checkCooldown, recordFetch, runSkipTrace, checkSkipTraceCooldown, recordSkipTrace, getLastSkipTraceError, calculateAdjustedComp, calculateArvFromComps, checkFetchCompsCooldown, recordFetchComps } from "../../services/propertyApi";
+import { fetchPropertyData, checkCooldown, recordFetch, runSkipTrace, checkSkipTraceCooldown, recordSkipTrace, getLastSkipTraceError, calculateAdjustedComp, calculateArvFromComps, checkFetchCompsCooldown, recordFetchComps } from "../../services/propertyApi";
+import { geocodeViaAttom, fetchCompsViaAttom, hasAttomKey } from "../../services/attomApi";
 
 // ─── In-memory comps job store ────────────────────────────────────────────────
 interface CompsJob {
@@ -1174,20 +1175,32 @@ router.post("/:id/fetch-comps", crmAuth, async (req, res) => {
     }
     if (!isSuperAdmin) recordFetchComps(campaignId);
 
-    // ── Resolve lat/lng ─────────────────────────────────────────────────────
+    // ── Resolve lat/lng — use ATTOM geocoding (free on trial) ────────────────
     let lat: number | null = lead.latitude ? parseFloat(lead.latitude) : null;
     let lng: number | null = lead.longitude ? parseFloat(lead.longitude) : null;
 
     if (!lat || !lng) {
-      const parts = [lead.address, lead.city, lead.state, lead.zip].filter(Boolean);
-      const address = parts.join(", ");
-      if (!address) { res.status(400).json({ error: "Lead has no address to geocode" }); return; }
+      if (!lead.address) { res.status(400).json({ error: "Lead has no address to geocode" }); return; }
 
-      const propData = await fetchPropertyData(address);
-      if (propData) {
-        lat = propData.latitude ?? null;
-        lng = propData.longitude ?? null;
-        if (lat && lng) {
+      if (hasAttomKey()) {
+        const coords = await geocodeViaAttom(lead.address, lead.city, lead.state, lead.zip);
+        if (coords) {
+          lat = coords.lat;
+          lng = coords.lng;
+          await db.update(crmLeads)
+            .set({ latitude: lat.toString(), longitude: lng.toString(), updatedAt: new Date() })
+            .where(eq(crmLeads.id, id));
+        }
+      }
+
+      // Last resort: PropertyAPI geocoding
+      if (!lat || !lng) {
+        const propData = await fetchPropertyData(
+          [lead.address, lead.city, lead.state, lead.zip].filter(Boolean).join(", ")
+        );
+        if (propData?.latitude && propData?.longitude) {
+          lat = propData.latitude;
+          lng = propData.longitude;
           await db.update(crmLeads)
             .set({ latitude: lat.toString(), longitude: lng.toString(), updatedAt: new Date() })
             .where(eq(crmLeads.id, id));
@@ -1195,7 +1208,7 @@ router.post("/:id/fetch-comps", crmAuth, async (req, res) => {
       }
     }
 
-    // If we still have no coordinates (PropertyAPI failed/exhausted), fall back to AI directly
+    // If still no coordinates → AI fallback
     if (!lat || !lng) {
       const subjectProp = {
         beds: lead.beds ?? null,
@@ -1207,48 +1220,12 @@ router.post("/:id/fetch-comps", crmAuth, async (req, res) => {
       if (aiResult.added > 0) {
         res.json({ status: "done", success: true, aiGenerated: true, added: aiResult.added, comps: aiResult.comps, arv: aiResult.arv, mao: aiResult.mao });
       } else {
-        res.status(503).json({ error: "Could not resolve property coordinates and AI fallback failed. Please fill in the address and try again." });
+        res.status(503).json({ error: "Could not resolve property coordinates. Please verify the address." });
       }
       return;
     }
 
-    // ── Start export job (count + kick off export) — returns immediately ────
-    const started = await startCompsExport(lat, lng, radiusMiles);
-
-    if (started.error || !started.exportToken) {
-      // Credits exhausted → fall back to AI-generated comps immediately
-      if (started.error?.toLowerCase().includes("credits exhausted") || started.error?.toLowerCase().includes("all propertyapi")) {
-        const subjectProp = {
-          beds: lead.beds ?? null,
-          baths: lead.baths ? parseFloat(lead.baths) : null,
-          sqft: lead.sqft ?? null,
-          yearBuilt: lead.yearBuilt ?? null,
-        };
-        const aiResult = await fetchCompsViaAI(lead, id, subjectProp);
-        if (aiResult.added > 0) {
-          res.json({
-            status: "done",
-            success: true,
-            aiGenerated: true,
-            added: aiResult.added,
-            comps: aiResult.comps,
-            arv: aiResult.arv,
-            mao: aiResult.mao,
-          });
-        } else {
-          res.status(503).json({ error: "All PropertyAPI credits exhausted and AI fallback failed. Please try again later." });
-        }
-        return;
-      }
-      if (started.count === 0) {
-        res.json({ success: true, added: 0, comps: [], message: "No properties found in this radius." });
-      } else {
-        res.status(422).json({ error: started.error, totalInRadius: started.count });
-      }
-      return;
-    }
-
-    // ── Store job, return job token to frontend for polling ─────────────────
+    // ── Fetch comps via ATTOM sale/snapshot (synchronous, no polling needed) ─
     const subjectProp = {
       beds: lead.beds ?? null,
       baths: lead.baths ? parseFloat(lead.baths) : null,
@@ -1256,23 +1233,96 @@ router.post("/:id/fetch-comps", crmAuth, async (req, res) => {
       yearBuilt: lead.yearBuilt ?? null,
     };
 
-    compsJobs.set(started.exportToken, {
-      leadId: id,
-      apiKey: started.apiKey,
-      exportToken: started.exportToken,
-      count: started.count,
-      actualRadius: started.actualRadius,
-      requestedRadius: radiusMiles,
-      startedAt: Date.now(),
-      subjectProp,
-      campaignId,
-    });
+    if (!hasAttomKey()) {
+      const aiResult = await fetchCompsViaAI(lead, id, subjectProp);
+      if (aiResult.added > 0) {
+        res.json({ status: "done", success: true, aiGenerated: true, added: aiResult.added, comps: aiResult.comps, arv: aiResult.arv, mao: aiResult.mao });
+      } else {
+        res.status(503).json({ error: "ATTOM API key not configured and AI fallback failed." });
+      }
+      return;
+    }
+
+    let rawComps;
+    try {
+      rawComps = await fetchCompsViaAttom(lat, lng, radiusMiles, 8);
+    } catch (attomErr: any) {
+      console.error("[ATTOM comps] failed:", attomErr?.message);
+      // ATTOM failed → fall back to AI
+      const aiResult = await fetchCompsViaAI(lead, id, subjectProp);
+      if (aiResult.added > 0) {
+        res.json({ status: "done", success: true, aiGenerated: true, added: aiResult.added, comps: aiResult.comps, arv: aiResult.arv, mao: aiResult.mao });
+      } else {
+        res.status(503).json({ error: `ATTOM comps failed: ${attomErr?.message}` });
+      }
+      return;
+    }
+
+    if (rawComps.length === 0) {
+      res.json({ status: "done", success: true, added: 0, comps: [], message: `No recently-sold properties (last 24 months) found within ${radiusMiles} mi.` });
+      return;
+    }
+
+    // Derive market $/sqft from actual comps
+    const sqftRates = rawComps
+      .filter(c => c.salePrice > 0 && (c.sqft ?? 0) > 0)
+      .map(c => c.salePrice / c.sqft!)
+      .sort((a, b) => a - b);
+    const marketPricePerSqft = sqftRates.length > 0
+      ? sqftRates[Math.floor(sqftRates.length / 2)]
+      : undefined;
+
+    const insertedComps: any[] = [];
+    for (const c of rawComps) {
+      const adjustedPrice = calculateAdjustedComp(
+        { beds: subjectProp.beds, baths: subjectProp.baths, sqft: subjectProp.sqft, yearBuilt: subjectProp.yearBuilt },
+        { salePrice: c.salePrice, beds: c.beds ?? null, baths: c.baths ?? null, sqft: c.sqft ?? null, yearBuilt: c.yearBuilt ?? null, soldDate: c.soldDate || null },
+        marketPricePerSqft,
+      );
+      const [inserted] = await db.insert(crmComps).values({
+        leadId: id,
+        address: c.address,
+        beds: c.beds ?? null,
+        baths: c.baths != null ? c.baths.toString() : null,
+        sqft: c.sqft ?? null,
+        yearBuilt: c.yearBuilt ?? null,
+        salePrice: c.salePrice.toString(),
+        soldDate: c.soldDate || null,
+        adjustedPrice: adjustedPrice.toString(),
+        source: "attom",
+        notes: `Auto-fetched via ATTOM (${radiusMiles} mi radius)${c.propertyType ? ` — ${c.propertyType}` : ""}`,
+      }).returning();
+      insertedComps.push({
+        id: inserted.id, address: inserted.address, beds: inserted.beds,
+        baths: inserted.baths ? parseFloat(inserted.baths) : null,
+        sqft: inserted.sqft, yearBuilt: inserted.yearBuilt,
+        salePrice: c.salePrice, soldDate: inserted.soldDate, adjustedPrice, notes: inserted.notes,
+      });
+    }
+
+    // Recalculate ARV from all comps on this lead
+    const allComps = await db.select().from(crmComps).where(eq(crmComps.leadId, id));
+    const adjustedPrices: number[] = allComps
+      .filter(c => c.adjustedPrice)
+      .map(c => parseFloat(c.adjustedPrice as string));
+
+    const newArv = calculateArvFromComps(adjustedPrices);
+    const erc = lead.estimatedRepairCost ? parseFloat(lead.estimatedRepairCost) : null;
+    const newMao = newArv && erc != null ? Math.round(newArv * 0.80 - erc) : null;
+
+    if (newArv) {
+      await db.update(crmLeads)
+        .set({ arv: newArv.toString(), mao: newMao != null ? newMao.toString() : null, updatedAt: new Date() })
+        .where(eq(crmLeads.id, id));
+    }
 
     res.json({
-      status: "pending",
-      jobToken: started.exportToken,
-      count: started.count,
-      actualRadius: started.actualRadius,
+      status: "done",
+      success: true,
+      added: insertedComps.length,
+      arv: newArv,
+      mao: newMao,
+      comps: insertedComps,
     });
   } catch (err) {
     console.error("Fetch comps start error:", err);
