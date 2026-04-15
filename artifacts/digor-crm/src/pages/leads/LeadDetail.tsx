@@ -41,6 +41,21 @@ const LEAD_SOURCES = ["Phone Outreach", "Direct Mail", "Text Blast", "Driving fo
 const REASON_OPTIONS = ["Divorce", "Probate", "Job Loss", "Relocation", "Downsizing", "Inherited", "Behind on Payments", "Major Repairs Needed", "Tired Landlord", "Other"];
 const HOW_SOON_OPTIONS = ["ASAP", "Within 30 Days", "1-3 Months", "3-6 Months", "6+ Months", "Just Exploring"];
 
+// ─── Address auto-parser ──────────────────────────────────────────────────────
+function parseFullAddress(raw: string): { address?: string; city?: string; state?: string; zip?: string } | null {
+  const s = raw.trim();
+  // Format 1: "Street, City, ST ZIP"  (two commas)
+  let m = s.match(/^(.+?),\s*(.+?),\s*([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+  if (m) return { address: m[1].trim(), city: m[2].trim(), state: m[3].toUpperCase(), zip: m[4].trim() };
+  // Format 2: "Street City, ST ZIP"  (city runs into street, one comma before state)
+  m = s.match(/^(.*\b(?:St|Ave|Blvd|Dr|Rd|Ct|Ln|Way|Pl|Ter|Cir|Hwy|Pkwy|Sq|Loop|Trl|Pass)\.?)\s+(.+?),\s*([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/i);
+  if (m) return { address: m[1].trim(), city: m[2].trim(), state: m[3].toUpperCase(), zip: m[4].trim() };
+  // Format 3: "Street, ST ZIP"  (no city field)
+  m = s.match(/^(.+?),\s*([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+  if (m) return { address: m[1].trim(), city: undefined, state: m[2].toUpperCase(), zip: m[3].trim() };
+  return null;
+}
+
 // ─── apiFetch helper ─────────────────────────────────────────────────────────
 function apiFetch(path: string, options?: RequestInit) {
   const token = localStorage.getItem("crm_token");
@@ -2057,7 +2072,26 @@ export default function LeadDetail() {
             <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2 md:col-span-3">
                 <Label>Street Address</Label>
-                <Input className="bg-background/50 rounded-xl" value={formData.address || ""} onChange={e => field("address")(e.target.value)} />
+                <Input
+                  className="bg-background/50 rounded-xl"
+                  value={formData.address || ""}
+                  placeholder="Paste full address or type street only"
+                  onChange={e => {
+                    const val = e.target.value;
+                    const parsed = parseFullAddress(val);
+                    if (parsed && (parsed.city || parsed.state || parsed.zip)) {
+                      setFormData((f: any) => ({
+                        ...f,
+                        address: parsed.address || val,
+                        ...(parsed.city ? { city: parsed.city } : {}),
+                        ...(parsed.state ? { state: parsed.state } : {}),
+                        ...(parsed.zip ? { zip: parsed.zip } : {}),
+                      }));
+                    } else {
+                      field("address")(val);
+                    }
+                  }}
+                />
               </div>
               <div className="space-y-2">
                 <Label>City</Label>

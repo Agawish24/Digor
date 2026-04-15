@@ -67,15 +67,15 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'sha256-0P9I8qsvwMz4FVU90GU0DD7e7jxlEP3eveGDv5VZrXY='"],
+        scriptSrc: ["'self'"],
         scriptSrcAttr: ["'none'"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", "data:", "https:"],
         connectSrc: ["'self'"],
         fontSrc: ["'self'", "https:"],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],
-        frameSrc: ["'none'"],
+        frameSrc: ["https://maps.google.com", "https://www.google.com"],
         frameAncestors: ["'none'"],
         upgradeInsecureRequests: [],
       },

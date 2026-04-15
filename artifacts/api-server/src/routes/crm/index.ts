@@ -59,14 +59,21 @@ router.get("/crm/public/submit/:token", async (req, res) => {
 
 // Parse a freeform US address string into components
 function parseAddressComponents(full: string): { address: string; city: string | null; state: string | null; zip: string | null } {
-  // Try "123 Main St, City Name, ST 12345" or "123 Main St, City, ST 12345-6789"
-  const m = full.match(/^(.+?),\s*(.+?),\s*([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+  const s = full.trim();
+  // Format 1: "123 Main St, City, ST 12345" or "123 Main St, City, ST 12345-6789"
+  let m = s.match(/^(.+?),\s*(.+?),\s*([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/);
   if (m) return { address: m[1].trim(), city: m[2].trim(), state: m[3].toUpperCase(), zip: m[4].trim() };
-  // Try "123 Main St, City, ST" (no zip)
-  const m2 = full.match(/^(.+?),\s*(.+?),\s*([A-Za-z]{2})$/);
-  if (m2) return { address: m2[1].trim(), city: m2[2].trim(), state: m2[3].toUpperCase(), zip: null };
+  // Format 2: "123 Main St City, ST 12345" (city runs into street with no comma)
+  m = s.match(/^(.*\b(?:St|Ave|Blvd|Dr|Rd|Ct|Ln|Way|Pl|Ter|Cir|Hwy|Pkwy|Sq|Loop|Trl|Pass)\.?)\s+(.+?),\s*([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/i);
+  if (m) return { address: m[1].trim(), city: m[2].trim(), state: m[3].toUpperCase(), zip: m[4].trim() };
+  // Format 3: "123 Main St, City, ST" (no zip)
+  m = s.match(/^(.+?),\s*(.+?),\s*([A-Za-z]{2})$/);
+  if (m) return { address: m[1].trim(), city: m[2].trim(), state: m[3].toUpperCase(), zip: null };
+  // Format 4: "123 Main St, ST 12345" (no city)
+  m = s.match(/^(.+?),\s*([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+  if (m) return { address: m[1].trim(), city: null, state: m[2].toUpperCase(), zip: m[3].trim() };
   // Fallback — store entire string as address
-  return { address: full.trim(), city: null, state: null, zip: null };
+  return { address: s, city: null, state: null, zip: null };
 }
 
 // Public lead submission: POST /crm/public/submit/:token
