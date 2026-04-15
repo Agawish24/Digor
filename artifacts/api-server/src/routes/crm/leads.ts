@@ -1412,55 +1412,79 @@ router.post("/:id/ai-deal-score", crmAuth, async (req, res) => {
     const askingPrice = lead.askingPrice ? parseFloat(lead.askingPrice) : null;
     const erc = lead.estimatedRepairCost ? parseFloat(lead.estimatedRepairCost) : null;
 
-    const prompt = `You are a real estate investment deal analyzer. Analyze this wholesale real estate deal and score it.
+    // Formatting for the prompt
+    const formattedMao = mao ? "$" + mao.toLocaleString() : "not set";
+    const formattedAsking = askingPrice ? "$" + askingPrice.toLocaleString() : "not set";
+    const occupancyInfo = lead.isRental 
+      ? `CURRENTLY RENTED for $${lead.rentalAmount}/mo (Tenant in place)` 
+      : (lead.occupancy || "unknown");
 
-Property: ${lead.address}, ${lead.city}, ${lead.state} ${lead.zip}
-Type: ${lead.propertyType || "Single Family"} | Beds: ${lead.beds || "?"} | Baths: ${lead.baths || "?"} | Sqft: ${lead.sqft || "?"} | Built: ${lead.yearBuilt || "?"}
-Condition (1-10): ${lead.condition || "unknown"} | Occupancy: ${lead.occupancy || "unknown"}
+    const prompt = `You are a real estate investment deal analyzer. 
+Analyze this wholesale deal and provide a score. 
+
+CRITICAL INSTRUCTIONS:
+1. Recommendation MUST be based on the MAO of ${formattedMao}. 
+2. If property is RENTED, reflect this in the Risk and Positives sections.
+3. If Asking Price (${formattedAsking}) is higher than MAO (${formattedMao}), the score should reflect a difficult negotiation.
+
+Property Data:
+Address: ${lead.address}, ${lead.city}, ${lead.state}
+Type: ${lead.propertyType || "Single Family"} | Condition: ${lead.condition || "unknown"}
+Occupancy: ${occupancyInfo}
 ARV: ${arv ? "$" + arv.toLocaleString() : "not set"}
 Repair Cost: ${erc ? "$" + erc.toLocaleString() : "not set"}
-MAO: ${mao ? "$" + mao.toLocaleString() : "not set"}
-Asking Price: ${askingPrice ? "$" + askingPrice.toLocaleString() : "not set"}
-Reason for Selling: ${lead.reasonForSelling || "not provided"}
-How Soon: ${lead.howSoon || "not provided"}
-Is Rental: ${lead.isRental ? "Yes, $" + lead.rentalAmount + "/mo" : "No"}
+MAO: ${formattedMao}
+Asking Price: ${formattedAsking}
+Motivation: ${lead.reasonForSelling || "not provided"} | Timeline: ${lead.howSoon || "not provided"}
 
-Reply ONLY with this JSON:
+Reply ONLY with this JSON structure:
 {
   "score": 7,
   "grade": "B+",
-  "verdict": "Good deal with strong motivation",
-  "profitPotential": { "score": 8, "note": "Strong spread between ARV and asking price" },
-  "sellerMotivation": { "score": 9, "note": "Divorce, needs to sell ASAP" },
-  "dealRisk": { "score": 6, "note": "Condition unknown, verify repairs" },
-  "urgency": { "score": 7, "note": "Motivated to close within 30 days" },
-  "recommendation": "Pursue aggressively. Open at $140k, walk at $160k.",
-  "redFlags": ["Repair cost not verified", "Occupancy unknown"],
-  "positives": ["Strong seller motivation", "Good ARV-to-price spread"]
+  "verdict": "Detailed summary focusing on the ${formattedAsking} vs ${formattedMao} spread",
+  "profitPotential": { "score": 8, "note": "Note regarding the spread from MAO" },
+  "sellerMotivation": { "score": 9, "note": "Note regarding ${lead.reasonForSelling}" },
+  "dealRisk": { "score": 6, "note": "Note regarding repairs and ${occupancyInfo}" },
+  "urgency": { "score": 7, "note": "Note regarding ${lead.howSoon}" },
+  "recommendation": "Suggest an opening price and a walk-away price based ONLY on the MAO of ${formattedMao}.",
+  "redFlags": ["Flag 1", "Flag 2"],
+  "positives": ["Positive 1", "Positive 2"]
 }`;
 
     const aiRes = await fetch(`${aiBaseUrl}/chat/completions`, {
       method: "POST",
       headers: { "Authorization": `Bearer ${aiApiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
+        // Using the lighter model to avoid TPM limits if needed, 
+        // but kept your variable for consistency
         model: process.env.AI_MODEL || "llama-3.1-8b-instant",
-        max_tokens: 400,
+        max_tokens: 1000,
+        response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: "You are a real estate investment analyst. Reply only with valid JSON." },
+          { role: "system", content: "You are a real estate investment analyst. You must output valid JSON based on provided financial data." },
           { role: "user", content: prompt },
         ],
       }),
     });
-    if (!aiRes.ok) { const e = await aiRes.text().catch(() => ""); console.error("AI deal score error:", e); res.status(502).json({ error: "AI service returned an error." }); return; }
+
+    if (!aiRes.ok) { 
+      const e = await aiRes.text().catch(() => ""); 
+      console.error("AI deal score error:", e); 
+      res.status(502).json({ error: "AI service returned an error." }); 
+      return; 
+    }
+
     const aiJson = await aiRes.json() as any;
     const raw = aiJson?.choices?.[0]?.message?.content || "";
     const cleaned = raw.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/, "").trim();
+
     res.json(JSON.parse(cleaned));
   } catch (err) {
     console.error("AI deal score error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
 
 // ─── AI Seller Script ─────────────────────────────────────────────────────────
 router.post("/:id/ai-seller-script", crmAuth, async (req, res) => {

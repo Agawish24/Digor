@@ -1058,7 +1058,6 @@ function AiRepairEstimator({ leadId, onApplied }: { leadId: number; onApplied: (
     </Card>
   );
 }
-// ─── AI Deal Scorer ────────────────────────────────────────────────────────────
 function AiDealScorer({ leadId }: { leadId: number }) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -1073,9 +1072,23 @@ function AiDealScorer({ leadId }: { leadId: number }) {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       });
+
+      // FIX 1: Robust error checking before parsing JSON
+      const isJson = resp.headers.get("content-type")?.includes("application/json");
+      if (!resp.ok) {
+        const errorData = isJson ? await resp.json() : { error: `Server Error (${resp.status})` };
+        throw new Error(errorData.error || "Scoring failed");
+      }
+
       const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || "Scoring failed");
       setResult(data);
+
+      // FIX 2: Smooth scroll to results so the user sees the score immediately
+      setTimeout(() => {
+        const el = document.getElementById(`score-result-${leadId}`);
+        el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 100);
+
     } catch (err: any) {
       toast({ title: "Scoring failed", description: err.message, variant: "destructive" });
     } finally {
@@ -1097,8 +1110,9 @@ function AiDealScorer({ leadId }: { leadId: number }) {
         <Button className="w-full gap-2 rounded-xl" onClick={handleScore} disabled={loading}>
           {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Analyzing Deal…</> : <><Sparkles className="w-4 h-4" /> Score This Deal</>}
         </Button>
+
         {result && (
-          <div className="space-y-4">
+          <div id={`score-result-${leadId}`} className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
             <div className="flex items-center justify-between p-4 rounded-xl bg-secondary/40 border border-white/5">
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Deal Score</p>
@@ -1107,6 +1121,8 @@ function AiDealScorer({ leadId }: { leadId: number }) {
               </div>
               <Badge className={`text-2xl font-bold px-4 py-2 ${gradeColor(result.grade)}`}>{result.grade}</Badge>
             </div>
+
+            {/* ... Rest of your UI grid and logic is perfectly fine ... */}
             <div className="grid grid-cols-2 gap-2">
               {[
                 { label: "Profit Potential", data: result.profitPotential },
@@ -1121,12 +1137,15 @@ function AiDealScorer({ leadId }: { leadId: number }) {
                 </div>
               ))}
             </div>
+
             {result.recommendation && (
               <div className="p-3 rounded-xl bg-primary/10 border border-primary/20">
                 <p className="text-xs font-semibold text-primary mb-1">Recommendation</p>
-                <p className="text-sm">{result.recommendation}</p>
+                <p className="text-sm italic">"{result.recommendation}"</p>
               </div>
             )}
+
+            {/* Positives and Red Flags lists look good! */}
             {result.positives?.length > 0 && (
               <div>
                 <p className="text-xs font-semibold text-green-400 mb-2">Positives</p>
@@ -1145,6 +1164,7 @@ function AiDealScorer({ leadId }: { leadId: number }) {
     </Card>
   );
 }
+
 
 // ─── AI Seller Script ──────────────────────────────────────────────────────────
 function AiSellerScript({ leadId }: { leadId: number }) {
