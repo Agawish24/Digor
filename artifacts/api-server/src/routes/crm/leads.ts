@@ -1068,7 +1068,7 @@ async function fetchCompsViaAI(lead: any, leadId: number, subjectProp: {
       headers: { "Authorization": `Bearer ${aiApiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: process.env.AI_MODEL || "gemini-2.0-flash",
-        max_tokens: 2048,
+        max_tokens: 1024,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user",   content: userPrompt },
@@ -1443,7 +1443,7 @@ Reply ONLY with this JSON:
       method: "POST",
       headers: { "Authorization": `Bearer ${aiApiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: process.env.AI_MODEL || "llama-3.3-70b-versatile",
+        model: process.env.AI_MODEL || "llama-3.1-8b-instant",
         max_tokens: 1024,
         messages: [
           { role: "system", content: "You are a real estate investment analyst. Reply only with valid JSON." },
@@ -1504,8 +1504,8 @@ Reply ONLY with this JSON:
       method: "POST",
       headers: { "Authorization": `Bearer ${aiApiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: process.env.AI_MODEL || "llama-3.3-70b-versatile",
-        max_tokens: 2048,
+        model: process.env.AI_MODEL || "llama-3.1-8b-instant",
+        max_tokens: 1024,
         messages: [
           { role: "system", content: "You are a real estate wholesaling coach. Reply only with valid JSON." },
           { role: "user", content: prompt },
@@ -1558,14 +1558,21 @@ Reply ONLY with this JSON:
       method: "POST",
       headers: { "Authorization": `Bearer ${aiApiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: process.env.AI_MODEL || "llama-3.3-70b-versatile",
-        max_tokens: 1500,
+        // 1. Switch to the smaller, faster model
+        model: "llama-3.1-8b-instant", 
+
+        // 2. Lower max_tokens to reduce the "requested" footprint
+        max_tokens: 1024, 
+
+        // 3. Keep JSON mode
+        response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: "You are a real estate attorney assistant. Generate professional offer letters. Reply only with valid JSON." },
+          { role: "system", content: "You are a real estate wholesaling coach. Reply ONLY with JSON." },
           { role: "user", content: prompt },
         ],
       }),
     });
+
     if (!aiRes.ok) { const e = await aiRes.text().catch(() => ""); console.error("AI offer letter error:", e); res.status(502).json({ error: "AI service returned an error." }); return; }
     const aiJson = await aiRes.json() as any;
     const raw = aiJson?.choices?.[0]?.message?.content || "";
