@@ -1083,7 +1083,12 @@ async function fetchCompsViaAI(lead: any, leadId: number, subjectProp: {
     }
 
     const json = await aiRes.json();
-    const content = json?.choices?.[0]?.message?.content ?? "";
+    const raw = json?.choices?.[0]?.message?.content ?? "";
+    const content = raw
+      .replace(/^```json\s*/i, "")
+      .replace(/^```\s*/i, "")
+      .replace(/```\s*$/, "")
+      .trim();
     const parsed = JSON.parse(content);
     const rawComps: any[] = parsed?.comps ?? [];
 
@@ -1673,4 +1678,6 @@ Reply ONLY with this JSON structure:
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+export default router;
 
