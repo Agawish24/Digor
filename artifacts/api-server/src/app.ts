@@ -67,12 +67,16 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
+        // 'unsafe-eval' and 'unsafe-inline' are required for most React/Vite production builds
         scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
         scriptSrcAttr: ["'none'"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://googleapis.com"],
+        // Added fonts.googleapis.com and corrected the URL
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         imgSrc: ["'self'", "data:", "https:"],
-        connectSrc: ["'self'"],
-        fontSrc: ["'self'", "https:", "https://gstatic.com", "data:"],
+        // IMPORTANT: Added OpenAI and Groq URLs so the Deal Scorer can communicate
+        connectSrc: ["'self'", "https://openai.com", "https://groq.com"],
+        // Added fonts.gstatic.com for the actual font files
+        fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],
         frameSrc: ["https://maps.google.com", "https://www.google.com"],
@@ -92,6 +96,7 @@ app.use(
     },
   })
 );
+
 
 app.use(
   pinoHttp({
