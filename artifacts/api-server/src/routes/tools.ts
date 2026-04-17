@@ -320,7 +320,7 @@ router.get("/tools/skip-trace/jobs", requirePin, (_req, res) => {
 });
 
 router.get("/tools/skip-trace/status/:jobId", requirePin, (req, res) => {
-  const job = skipTraceJobs.get(req.params.jobId!);
+  const job = skipTraceJobs.get(req.params.jobId as string);
   if (!job) { res.status(404).json({ error: "Job not found" }); return; }
   const { resultRows: _r, ...safe } = job;
   res.json(safe);
@@ -424,7 +424,7 @@ router.post("/tools/skip-trace/upload", requirePin, async (req: any, res) => {
           job.progressPercent = Math.round((job.processed / job.totalRecords) * 100);
         }
       }
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise<void>(resolve => setTimeout(resolve, 300));
     }
 
     job.status = "completed";
@@ -435,7 +435,7 @@ router.post("/tools/skip-trace/upload", requirePin, async (req: any, res) => {
 });
 
 router.get("/tools/skip-trace/download/:jobId", requirePin, (req, res) => {
-  const job = skipTraceJobs.get(req.params.jobId!);
+  const job = skipTraceJobs.get(req.params.jobId as string);
   if (!job) { res.status(404).json({ error: "Job not found" }); return; }
   if (job.status !== "completed") { res.status(400).json({ error: "Job not complete" }); return; }
   const csv = Papa.unparse(job.resultRows);
@@ -456,7 +456,7 @@ router.get("/tools/distressed/jobs", requirePin, (_req, res) => {
 });
 
 router.get("/tools/distressed/status/:jobId", requirePin, (req, res) => {
-  const job = distressedJobs.get(req.params.jobId!);
+  const job = distressedJobs.get(req.params.jobId as string);
   if (!job) { res.status(404).json({ error: "Job not found" }); return; }
   const { resultRows: _r, ...safe } = job;
   res.json(safe);
@@ -664,11 +664,11 @@ router.post("/tools/distressed/search", requirePin, async (req, res) => {
           logger.warn({ err, location: label }, "Distressed: ATTOM detailmortgageowner failed");
           break;
         }
-        await new Promise(r => setTimeout(r, 200));
+        await new Promise<void>(resolve => setTimeout(resolve, 200));
       }
 
       job.locationsProcessed++;
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise<void>(resolve => setTimeout(resolve, 300));
     }
 
     job.status = "completed";
@@ -678,7 +678,7 @@ router.post("/tools/distressed/search", requirePin, async (req, res) => {
 });
 
 router.get("/tools/distressed/download/:jobId", requirePin, (req, res) => {
-  const job = distressedJobs.get(req.params.jobId!);
+  const job = distressedJobs.get(req.params.jobId as string);
   if (!job) { res.status(404).json({ error: "Job not found" }); return; }
   if (job.status !== "completed") { res.status(400).json({ error: "Job not complete" }); return; }
   const csv = Papa.unparse(job.resultRows);
@@ -688,14 +688,14 @@ router.get("/tools/distressed/download/:jobId", requirePin, (req, res) => {
 });
 
 router.post("/tools/distressed/enrich/:jobId", requirePin, async (req, res) => {
-  const job = distressedJobs.get(req.params.jobId!);
+  const job = distressedJobs.get(req.params.jobId as string);
   if (!job) { res.status(404).json({ error: "Job not found" }); return; }
   if (job.status !== "completed" || !job.resultRows.length) { res.status(400).json({ error: "Job not complete or no results" }); return; }
   if (!getPropertyApiKeys().length) { res.status(503).json({ error: "PropertyAPI keys not configured" }); return; }
 
   const enrichJobId = randomUUID();
   const enrichJob: EnrichJob = {
-    enrichJobId, parentJobId: req.params.jobId!,
+    enrichJobId, parentJobId: req.params.jobId as string,
     status: "running", total: job.resultRows.length, processed: 0, resultRows: [],
   };
   enrichJobs.set(enrichJobId, enrichJob);
@@ -730,7 +730,7 @@ router.post("/tools/distressed/enrich/:jobId", requirePin, async (req, res) => {
           enrichJob.processed++;
         }
       }
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise<void>(resolve => setTimeout(resolve, 300));
     }
     enrichJob.status = "completed";
   });
@@ -739,14 +739,14 @@ router.post("/tools/distressed/enrich/:jobId", requirePin, async (req, res) => {
 });
 
 router.get("/tools/distressed/enrich-status/:enrichJobId", requirePin, (req, res) => {
-  const job = enrichJobs.get(req.params.enrichJobId!);
+  const job = enrichJobs.get(req.params.enrichJobId as string);
   if (!job) { res.status(404).json({ error: "Enrich job not found" }); return; }
   const { resultRows: _r, ...safe } = job;
   res.json(safe);
 });
 
 router.get("/tools/distressed/download-enriched/:enrichJobId", requirePin, (req, res) => {
-  const job = enrichJobs.get(req.params.enrichJobId!);
+  const job = enrichJobs.get(req.params.enrichJobId as string);
   if (!job) { res.status(404).json({ error: "Enrich job not found" }); return; }
   if (job.status !== "completed") { res.status(400).json({ error: "Enrichment not complete" }); return; }
   const csv = Papa.unparse(job.resultRows);

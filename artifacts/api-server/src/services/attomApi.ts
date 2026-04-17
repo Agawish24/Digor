@@ -170,7 +170,7 @@ export async function fetchAttomAvm(
   const data = await attomGet("/attomavm/detail", {
     address1: street,
     address2,
-  });
+  });fetchAttomAvm
 
   const prop = data?.property?.[0];
   const avm = prop?.avm;
