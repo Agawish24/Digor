@@ -708,7 +708,7 @@ Rather than a separate worker process or queue system, the sequence sender runs 
 | `CRM_ADMIN_EMAIL` | Yes | Super admin email (seeded on startup) |
 | `CRM_ADMIN_PASSWORD` | Yes | Super admin password (bcrypt hashed) |
 | `GROQ_API_KEY` | Yes (AI features) | Groq inference API key |
-| `AI_MODEL` | No | Override default model (default: `llama-3.1-70b-versatile`) |
+| `AI_MODEL` | No | Override default model (default: `llama-3.3-70b-versatile`) |
 | `ATTOM_API_KEY` | Yes (comps/AVM) | Primary ATTOM Data API key |
 | `ATTOM_API_KEY_2` | No | Secondary ATTOM key for rotation |
 | `PROPERTY_API_KEY` | Yes (property/skip trace) | PropertyAPI.co key (legacy single-key) |
